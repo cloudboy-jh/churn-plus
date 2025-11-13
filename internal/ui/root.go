@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/cloudboy-jh/churn-plus/internal/config"
 	"github.com/cloudboy-jh/churn-plus/internal/engine"
+	"github.com/cloudboy-jh/churn-plus/internal/theme"
 )
 
 // RootModel is the top-level model that switches between menu and TUI
@@ -13,12 +14,14 @@ type RootModel struct {
 	mode            AppMode
 	menuModel       MenuModel
 	tuiModel        Model
+	factory         *engine.Factory
 	orchestrator    *engine.PipelineOrchestrator
 	files           []*engine.FileInfo
 	fileTree        *engine.FileNode
 	cfg             *config.Config
 	ctx             *engine.ProjectContext
 	pipelineStarted bool
+	initError       error
 }
 
 // AppMode defines the current mode
@@ -34,7 +37,7 @@ func NewRootModel(
 	cfg *config.Config,
 	ctx *engine.ProjectContext,
 	fileTree *engine.FileNode,
-	orchestrator *engine.PipelineOrchestrator,
+	factory *engine.Factory,
 	files []*engine.FileInfo,
 	autoRun bool,
 ) RootModel {
@@ -46,12 +49,14 @@ func NewRootModel(
 	return RootModel{
 		mode:            mode,
 		menuModel:       NewMenuModel(cfg, ctx),
-		orchestrator:    orchestrator,
+		factory:         factory,
+		orchestrator:    nil, // Created on-demand
 		files:           files,
 		fileTree:        fileTree,
 		cfg:             cfg,
 		ctx:             ctx,
 		pipelineStarted: autoRun,
+		initError:       nil,
 	}
 }
 
@@ -61,9 +66,28 @@ func (rm RootModel) Init() tea.Cmd {
 		return rm.menuModel.Init()
 	}
 
-	// Auto-run mode: start pipeline immediately
-	if rm.pipelineStarted {
-		return rm.startPipeline()
+	// Auto-run mode: initialize provider and start pipeline immediately
+	if rm.pipelineStarted && rm.orchestrator == nil {
+		provider, err := rm.factory.CreateProvider()
+		if err != nil {
+			rm.initError = err
+			rm.mode = ModeMenu
+			return rm.menuModel.Init()
+		}
+
+		orchestrator, err := rm.factory.CreateDefaultPipeline(provider)
+		if err != nil {
+			rm.initError = err
+			rm.mode = ModeMenu
+			return rm.menuModel.Init()
+		}
+		orchestrator.SetContext(rm.ctx)
+		rm.orchestrator = orchestrator
+		rm.tuiModel = NewModel(rm.fileTree, rm.orchestrator.GetPipeline(), rm.orchestrator, rm.files, rm.ctx, true)
+		return tea.Batch(
+			rm.tuiModel.Init(),
+			rm.startPipeline(),
+		)
 	}
 
 	return nil
@@ -78,6 +102,23 @@ func (rm RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case StartAnalysisMsg:
+		// Initialize provider and orchestrator now
+		if rm.orchestrator == nil {
+			provider, err := rm.factory.CreateProvider()
+			if err != nil {
+				rm.initError = err
+				return rm, nil
+			}
+
+			orchestrator, err := rm.factory.CreateDefaultPipeline(provider)
+			if err != nil {
+				rm.initError = err
+				return rm, nil
+			}
+			orchestrator.SetContext(rm.ctx)
+			rm.orchestrator = orchestrator
+		}
+
 		// Switch from menu to TUI and start analysis
 		rm.mode = ModeTUI
 		rm.tuiModel = NewModel(rm.fileTree, rm.orchestrator.GetPipeline(), rm.orchestrator, rm.files, rm.ctx, true)
@@ -117,7 +158,15 @@ func (rm RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // View renders the current mode
 func (rm RootModel) View() string {
 	if rm.mode == ModeMenu {
-		return rm.menuModel.View()
+		view := rm.menuModel.View()
+		// Show initialization error if any
+		if rm.initError != nil {
+			view += "\n\n" + theme.ErrorStyle.Render("⚠ Error: "+rm.initError.Error())
+			view += "\n" + theme.MutedStyle.Render("Please configure API keys in Settings or via environment variables:")
+			view += "\n" + theme.MutedStyle.Render("  • Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY")
+			view += "\n" + theme.MutedStyle.Render("  • Or configure in ~/.churn/config.json")
+		}
+		return view
 	}
 	return rm.tuiModel.View()
 }
@@ -137,6 +186,11 @@ func (rm RootModel) startPipeline() tea.Cmd {
 
 		return PipelineStartedMsg{events: events}
 	}
+}
+
+// GetOrchestrator returns the orchestrator if it has been created
+func (rm RootModel) GetOrchestrator() *engine.PipelineOrchestrator {
+	return rm.orchestrator
 }
 
 // PipelineStartedMsg signals the pipeline has started

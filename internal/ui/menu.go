@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/cloudboy-jh/churn-plus/internal/config"
 	"github.com/cloudboy-jh/churn-plus/internal/engine"
@@ -32,8 +33,11 @@ type MenuModel struct {
 
 // SettingsSubmenuModel handles settings configuration
 type SettingsSubmenuModel struct {
-	selectedIndex int
-	settingItems  []string
+	selectedIndex  int
+	settingItems   []string
+	editingAPIKey  bool
+	apiKeyProvider string
+	textInput      textinput.Model
 }
 
 // SubmenuType defines the type of submenu
@@ -87,8 +91,22 @@ func NewMenuModel(cfg *config.Config, ctx *engine.ProjectContext) MenuModel {
 				"Cache Settings",
 				"UI Settings",
 			},
+			editingAPIKey:  false,
+			apiKeyProvider: "",
+			textInput:      createAPIKeyInput(),
 		},
 	}
+}
+
+// createAPIKeyInput creates a text input for API key entry
+func createAPIKeyInput() textinput.Model {
+	ti := textinput.New()
+	ti.Placeholder = "Enter API key..."
+	ti.CharLimit = 200
+	ti.Width = 60
+	ti.EchoMode = textinput.EchoPassword
+	ti.EchoCharacter = '•'
+	return ti
 }
 
 // getDefaultPasses returns default pipeline configuration
@@ -249,6 +267,45 @@ func (m MenuModel) updatePipelineSubmenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // updateSettingsSubmenu handles settings submenu navigation
 func (m MenuModel) updateSettingsSubmenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// If editing API key, handle text input
+	if m.settingsSubmenu.editingAPIKey {
+		switch msg.String() {
+		case "esc":
+			m.settingsSubmenu.editingAPIKey = false
+			m.settingsSubmenu.textInput.Reset()
+			return m, nil
+
+		case "enter":
+			// Save the API key
+			apiKey := m.settingsSubmenu.textInput.Value()
+			if apiKey != "" {
+				switch m.settingsSubmenu.apiKeyProvider {
+				case "anthropic":
+					m.cfg.Global.APIKeys.Anthropic = apiKey
+				case "openai":
+					m.cfg.Global.APIKeys.OpenAI = apiKey
+				case "google":
+					m.cfg.Global.APIKeys.Google = apiKey
+				}
+
+				// Save to global config
+				if err := config.SaveGlobalConfig(m.cfg.Global); err == nil {
+					// Success - exit editing mode
+					m.settingsSubmenu.editingAPIKey = false
+					m.settingsSubmenu.textInput.Reset()
+				}
+			}
+			return m, nil
+
+		default:
+			// Update text input
+			var cmd tea.Cmd
+			m.settingsSubmenu.textInput, cmd = m.settingsSubmenu.textInput.Update(msg)
+			return m, cmd
+		}
+	}
+
+	// Normal navigation
 	switch msg.String() {
 	case "esc":
 		m.inSubmenu = false
@@ -266,11 +323,43 @@ func (m MenuModel) updateSettingsSubmenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "enter":
-		// Handle settings selection
-		// For now, just placeholder
+		// Handle settings selection - only API Keys for now
+		if m.settingsSubmenu.selectedIndex == 0 {
+			// Show API key submenu
+			return m.showAPIKeyInput()
+		}
+
+	case "1", "2", "3":
+		// Quick key selection for API providers when on API Keys
+		if m.settingsSubmenu.selectedIndex == 0 {
+			var provider string
+			switch msg.String() {
+			case "1":
+				provider = "anthropic"
+			case "2":
+				provider = "openai"
+			case "3":
+				provider = "google"
+			}
+			m.settingsSubmenu.apiKeyProvider = provider
+			m.settingsSubmenu.editingAPIKey = true
+			m.settingsSubmenu.textInput.Focus()
+			m.settingsSubmenu.textInput.SetValue("")
+			return m, textinput.Blink
+		}
 	}
 
 	return m, nil
+}
+
+// showAPIKeyInput shows the API key input prompt
+func (m MenuModel) showAPIKeyInput() (tea.Model, tea.Cmd) {
+	// Default to Anthropic
+	m.settingsSubmenu.apiKeyProvider = "anthropic"
+	m.settingsSubmenu.editingAPIKey = true
+	m.settingsSubmenu.textInput.Focus()
+	m.settingsSubmenu.textInput.SetValue("")
+	return m, textinput.Blink
 }
 
 // savePipelineConfig saves the pipeline configuration
@@ -453,6 +542,17 @@ func (m MenuModel) renderSettingsSubmenu() string {
 
 	s.WriteString(theme.TitleStyle.Render("Settings"))
 	s.WriteString("\n\n")
+
+	// If editing API key, show input form
+	if m.settingsSubmenu.editingAPIKey {
+		s.WriteString("Enter API Key for " + theme.HighlightStyle.Render(m.settingsSubmenu.apiKeyProvider) + "\n\n")
+		s.WriteString(m.settingsSubmenu.textInput.View())
+		s.WriteString("\n\n")
+		s.WriteString(theme.MutedStyle.Render("Press 1/2/3 to switch provider | ENTER: Save | ESC: Cancel"))
+		s.WriteString("\n")
+		s.WriteString(theme.MutedStyle.Render("  1: Anthropic | 2: OpenAI | 3: Google"))
+		return s.String()
+	}
 
 	s.WriteString("Configure global settings for churn-plus.\n\n")
 
