@@ -1,0 +1,30 @@
+# Binaries
+churn-plus
+churn-plus.exe
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build artifacts
+dist/
+*.test
+*.out
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Churn-specific
+.churn/
+
+# Go
+go.work
+go.work.sum
