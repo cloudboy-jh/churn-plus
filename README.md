@@ -8,13 +8,16 @@ Churn-Plus is a complete architectural rewrite of [Churn](https://github.com/clo
 
 ## Features
 
-- **4-Pane TUI**: File tree, code preview, findings, and pipeline status in a single view
-- **Multi-Pass Analysis**: Lint → Refactor → Local Refinement → Summary
+- **Interactive Menu System**: Beautiful TUI with model selection, settings, and navigation
+- **Two-Pane Horizontal Layout**: Findings list (left) and detailed view (right) for focused analysis
+- **LLM Hand-Off**: Press `l` to send any finding to an LLM for automated fix suggestions
 - **Multi-Model Support**: OpenAI (GPT), Anthropic (Claude), Google (Gemini), Ollama (local)
+- **Streaming Responses**: Watch LLM responses stream in real-time with solid modal overlays
+- **Patch Preview & Apply**: Preview diffs before applying changes, with automatic backups
 - **Structured Findings**: Severity levels, categorization, and actionable recommendations
-- **Real-Time Updates**: Watch pipeline progress as it analyzes your code
 - **Local-First**: Uses `.churn/` directory pattern, fully compatible with original Churn
 - **Privacy Option**: Ollama integration for 100% local analysis
+- **Churn Branding**: Coral red (#ff5656) theme with solid backgrounds, not just outlines
 
 ## Installation
 
