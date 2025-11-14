@@ -8,16 +8,28 @@ Churn-Plus is a complete architectural rewrite of [Churn](https://github.com/clo
 
 ## Features
 
-- **Interactive Menu System**: Beautiful TUI with model selection, settings, and navigation
-- **Two-Pane Horizontal Layout**: Findings list (left) and detailed view (right) for focused analysis
-- **LLM Hand-Off**: Press `l` to send any finding to an LLM for automated fix suggestions
+### Core Functionality
+- **Interactive Menu System**: Navigate START ANALYSIS, MODEL SELECT, SETTINGS, and EXIT with arrow keys
+- **Two-Pane Horizontal Layout**: Findings list (left 1/3) and detailed view (right 2/3) for focused analysis
+- **LLM Hand-Off**: Press `l` on any finding to send it to your configured LLM for automated fix suggestions
+- **Streaming Responses**: Watch LLM responses stream in real-time in modal overlays
+- **Patch Preview & Apply**: Preview unified diffs before applying changes, with automatic `.bak` file creation
+- **Model Selection**: Two-step provider and model selection that persists to project config
+- **Settings View**: View your configuration including API keys (masked), concurrency limits, and cache settings
+
+### Analysis Engine
 - **Multi-Model Support**: OpenAI (GPT), Anthropic (Claude), Google (Gemini), Ollama (local)
-- **Streaming Responses**: Watch LLM responses stream in real-time with solid modal overlays
-- **Patch Preview & Apply**: Preview diffs before applying changes, with automatic backups
-- **Structured Findings**: Severity levels, categorization, and actionable recommendations
+- **Multi-Pass Pipeline**: Configurable analysis passes (lint, refactor, summary)
+- **Structured Findings**: Severity levels (🔴 HIGH, 🟡 MEDIUM, 🔵 LOW), categorization, and actionable recommendations
+- **Intelligent Context Building**: Sends optimized context to LLMs for accurate fix suggestions
+
+### Design & UX
+- **Churn Branding**: Coral red (#ff5656) theme with solid backgrounds throughout
+- **Focus-Aware UI**: Active panes highlighted with coral red borders
+- **Responsive Layout**: Adapts to terminal size with scrollable lists
+- **Arrow Key Navigation**: Consistent navigation pattern across all screens
 - **Local-First**: Uses `.churn/` directory pattern, fully compatible with original Churn
 - **Privacy Option**: Ollama integration for 100% local analysis
-- **Churn Branding**: Coral red (#ff5656) theme with solid backgrounds, not just outlines
 
 ## Installation
 
@@ -77,8 +89,12 @@ Current Model Pipeline:
    - Or navigate with `↑/↓` arrows
 
 4. **Navigate the TUI** (after starting):
-   - `Tab` - Cycle focus between panes
-   - `h/j/k/l` or arrow keys - Navigate
+   - `↑/↓` arrows - Navigate findings list
+   - `Enter` - Select finding to view details
+   - `l` - Send current finding to LLM for fix suggestions
+   - `p` - Preview patch (if available)
+   - `a` - Apply patch (if available)
+   - `m` - Return to menu
    - `q` - Quit
 
 **Quick run (skip menu)**:
@@ -169,9 +185,14 @@ You can now configure your pipeline using the interactive menu or by editing the
 
 Churn-Plus is built on three core layers:
 
-1. **TUI Layer** (BubbleTea): 4-pane layout with real-time updates
-2. **Analysis Engine**: Project scanning, context building, pipeline orchestration
+1. **TUI Layer** (BubbleTea): Interactive menu + two-pane horizontal layout with real-time streaming
+2. **Analysis Engine**: Project scanning, context building, multi-pass pipeline orchestration
 3. **Model Providers**: Unified interface for OpenAI, Anthropic, Google, Ollama
+
+### UI Components
+- **Menu**: Main menu, model selection sub-menu, settings view
+- **TUI**: Two-pane layout (findings list | detail view)
+- **Modals**: LLM streaming overlay, patch preview
 
 See [ARCHITECTURE.md](../CHURN-PLUS_FULL_ARCHITECTURE.md) for complete details.
 
@@ -222,18 +243,29 @@ go test ./...
 
 ## Roadmap to Churn 3.0
 
+### ✅ Completed (v0.1.0)
 - [x] Go/BubbleTea foundation
-- [x] 4-pane TUI
-- [x] Multi-pass pipeline
-- [x] Multi-provider LLM support
-- [x] Interactive menu with pipeline configuration
-- [x] Settings submenu for viewing configuration
+- [x] Two-pane horizontal TUI (findings list | details)
+- [x] Multi-pass pipeline architecture
+- [x] Multi-provider LLM support (OpenAI, Anthropic, Google, Ollama)
+- [x] Interactive menu system (START, MODEL SELECT, SETTINGS, EXIT)
+- [x] Model selection sub-menu with provider → model workflow
+- [x] Settings view for configuration display
 - [x] Pipeline configuration persistence
+- [x] LLM hand-off feature (press `l` to send finding to LLM)
+- [x] Streaming LLM responses in modal overlay
+- [x] Patch preview functionality
+- [x] Solid coral red theme with focus-aware borders
+- [x] Arrow key navigation throughout
+
+### 🚧 In Progress / Planned
+- [ ] Patch application engine (currently mock implementation)
 - [ ] Enhanced syntax highlighting (Chroma integration)
-- [ ] Search within findings (`/` key)
-- [ ] Apply suggestions (with confirmation)
+- [ ] Search/filter within findings (`/` key)
+- [ ] Save LLM responses to findings
+- [ ] Multi-finding batch operations
 - [ ] Plugin system for custom passes
-- [ ] Performance optimizations
+- [ ] Performance optimizations for large codebases
 - [ ] Comprehensive test suite
 - [ ] Release as Churn 3.0
 
